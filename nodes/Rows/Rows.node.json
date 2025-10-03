@@ -1,0 +1,18 @@
+{
+	"node": "n8n-nodes-rows.rows",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Productivity"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://developers.rows.com/#section/Introduction-to-the-API/Authentication-and-Authorization"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://developers.rows.com/"
+			}
+		]
+	}
+}
