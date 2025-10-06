@@ -1,5 +1,5 @@
 {
-	"node": "n8n-nodes-rows.rows",
+	"node": "@rowshq/n8n-nodes-rows",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
 	"categories": ["Productivity"],

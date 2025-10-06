@@ -1,5 +1,8 @@
 {
-  "name": "n8n-nodes-rows.rows",
+  "name": "@rowshq/n8n-nodes-rows",
+  "publishConfig": {
+    "access": "public"
+  },
   "version": "1.0",
   "description": "Rows n8n node",
   "keywords": [
@@ -10,6 +13,10 @@
   "author": {
     "name": "Rows team",
     "email": "support@rows.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rows/rows-n8n-nodes-rows.git"
   },
   "engines": {
     "node": ">=20.15"
