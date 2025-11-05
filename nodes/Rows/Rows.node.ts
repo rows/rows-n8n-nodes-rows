@@ -10,6 +10,11 @@ import {
         NodeConnectionType,
 } from 'n8n-workflow';
 
+// Buffer is available in Node.js runtime
+declare const Buffer: {
+        from(data: string, encoding?: string): any;
+};
+
 async function appendDataToTable(context: IExecuteFunctions, itemIndex: number) {
         const spreadsheetId = context.getNodeParameter('spreadsheetId', itemIndex) as string;
         const tableId = context.getNodeParameter('tableId', itemIndex) as string;
@@ -76,6 +81,76 @@ async function overwriteDataInTable(context: IExecuteFunctions, itemIndex: numbe
         return response;
 }
 
+async function importDataFromVisionAI(context: IExecuteFunctions, itemIndex: number) {
+        const mode = context.getNodeParameter('visionMode', itemIndex) as string;
+        const binaryPropertyName = context.getNodeParameter('binaryPropertyName', itemIndex) as string;
+        const folderId = context.getNodeParameter('folderId', itemIndex, '') as string;
+        const appId = context.getNodeParameter('appId', itemIndex, '') as string;
+        const tableId = context.getNodeParameter('tableId', itemIndex, '') as string;
+        const instructions = context.getNodeParameter('instructions', itemIndex, '') as string;
+        const merge = context.getNodeParameter('merge', itemIndex, false) as boolean;
+
+        const item = context.getInputData()[itemIndex];
+        const binaryData = item.binary?.[binaryPropertyName];
+
+        if (!binaryData) {
+                throw new NodeOperationError(
+                        context.getNode(),
+                        `No binary data found for property "${binaryPropertyName}". Make sure the previous node outputs binary data.`
+                );
+        }
+
+        // n8n stores binary data as base64 strings
+        const dataBuffer = Buffer.from(binaryData.data, 'base64');
+        const fileName = binaryData.fileName || 'file';
+        const mimeType = binaryData.mimeType || 'application/pdf';
+
+        // Build form data with all required and optional parameters
+        const formData: any = {
+                files: {
+                        value: dataBuffer,
+                        options: {
+                                filename: fileName,
+                                contentType: mimeType,
+                        },
+                },
+                mode: mode,
+        };
+
+        // Add optional parameters if provided
+        if (folderId) {
+                formData.folder_id = folderId;
+        }
+
+        if (appId) {
+                formData.app_id = appId;
+        }
+
+        if (tableId) {
+                formData.table_id = tableId;
+        }
+
+        if (instructions) {
+                formData.instructions = instructions;
+        }
+
+        if (merge) {
+                formData.merge = merge.toString();
+        }
+
+        const options: IHttpRequestOptions = {
+                method: 'POST',
+                url: 'https://api.rows.com/v1/vision/import',
+                headers: {
+                        'Accept': 'application/json',
+                },
+                formData,
+        };
+
+        const response = await context.helpers.httpRequestWithAuthentication.call(context, 'rowsApi', options);
+        return response;
+}
+
 export class Rows implements INodeType {
         description: INodeTypeDescription = {
                 displayName: 'Rows',
@@ -115,6 +190,12 @@ export class Rows implements INodeType {
                                                 description: 'Overwrite data in a table',
                                                 action: 'Overwrite data in a table',
                                         },
+                                        {
+                                                name: 'Import from Vision AI',
+                                                value: 'importVisionAI',
+                                                description: 'Import data from PDF or image using Vision AI',
+                                                action: 'Import data from PDF or image using Vision AI',
+                                        },
                                 ],
                                 default: 'append',
                         },
@@ -127,6 +208,11 @@ export class Rows implements INodeType {
                                 },
                                 default: '',
                                 required: true,
+                                displayOptions: {
+                                        hide: {
+                                                operation: ['importVisionAI'],
+                                        },
+                                },
                                 description: 'The spreadsheet to operate on. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
                         },
                         {
@@ -139,6 +225,11 @@ export class Rows implements INodeType {
                                 },
                                 default: '',
                                 required: true,
+                                displayOptions: {
+                                        hide: {
+                                                operation: ['importVisionAI'],
+                                        },
+                                },
                                 description: 'The table to operate on. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
                         },
                         {
@@ -147,6 +238,11 @@ export class Rows implements INodeType {
                                 type: 'string',
                                 default: 'A1:B',
                                 required: true,
+                                displayOptions: {
+                                        hide: {
+                                                operation: ['importVisionAI'],
+                                        },
+                                },
                                 description: 'The range of cells to operate on (e.g., A1:B1000)',
                         },
                         {
@@ -158,8 +254,129 @@ export class Rows implements INodeType {
                                 },
                                 default: '',
                                 required: true,
+                                displayOptions: {
+                                        hide: {
+                                                operation: ['importVisionAI'],
+                                        },
+                                },
                                 description: 'The data to write (JSON array of arrays)',
                                 placeholder: '[["Name", "Email"], ["John Doe", "john@example.com"]]',
+                        },
+                        {
+                                displayName: 'Processing Mode',
+                                name: 'visionMode',
+                                type: 'options',
+                                default: 'read',
+                                required: true,
+                                displayOptions: {
+                                        show: {
+                                                operation: ['importVisionAI'],
+                                        },
+                                },
+                                options: [
+                                        {
+                                                name: 'Read',
+                                                value: 'read',
+                                                description: 'Extracts and returns table data with cell objects (col, row, value) without creating a spreadsheet',
+                                        },
+                                        {
+                                                name: 'Read Simplified',
+                                                value: 'read_simplified',
+                                                description: 'Extracts and returns table data with simple string values (no cell metadata) without creating a spreadsheet',
+                                        },
+                                        {
+                                                name: 'Create',
+                                                value: 'create',
+                                                description: 'Creates a spreadsheet with extracted tables',
+                                        },
+                                ],
+                                description: 'Processing mode for Vision AI',
+                        },
+                        {
+                                displayName: 'Binary Property',
+                                name: 'binaryPropertyName',
+                                type: 'string',
+                                default: 'data',
+                                required: true,
+                                displayOptions: {
+                                        show: {
+                                                operation: ['importVisionAI'],
+                                        },
+                                },
+                                description: 'The name of the binary property that contains the PDF or image file. Supported formats: PNG, JPG, JPEG, WEBP, PDF. The file should be provided by a previous node that outputs binary data.',
+                                placeholder: 'data',
+                        },
+                        {
+                                displayName: 'Folder ID',
+                                name: 'folderId',
+                                type: 'string',
+                                default: '',
+                                required: false,
+                                displayOptions: {
+                                        show: {
+                                                operation: ['importVisionAI'],
+                                                visionMode: ['create'],
+                                        },
+                                },
+                                description: 'The folder unique identifier where the spreadsheet will be created. If not present, the system will use the first available folder.',
+                        },
+                        {
+                                displayName: 'Spreadsheet ID',
+                                name: 'appId',
+                                type: 'string',
+                                default: '',
+                                required: false,
+                                displayOptions: {
+                                        show: {
+                                                operation: ['importVisionAI'],
+                                                visionMode: ['create'],
+                                        },
+                                },
+                                description: 'Target spreadsheet ID (for create mode when appending to existing spreadsheet). Optional. If not provided, a new spreadsheet will be created.',
+                        },
+                        {
+                                displayName: 'Table ID',
+                                name: 'tableId',
+                                type: 'string',
+                                default: '',
+                                required: false,
+                                displayOptions: {
+                                        show: {
+                                                operation: ['importVisionAI'],
+                                                visionMode: ['create'],
+                                        },
+                                },
+                                description: 'Target table ID (for create mode when appending to existing table). Optional. If provided, data will be appended to the specified table.',
+                        },
+                        {
+                                displayName: 'Instructions',
+                                name: 'instructions',
+                                type: 'string',
+                                typeOptions: {
+                                        rows: 3,
+                                },
+                                default: '',
+                                required: false,
+                                displayOptions: {
+                                        show: {
+                                                operation: ['importVisionAI'],
+                                        },
+                                },
+                                description: 'Optional instructions for the AI to guide the extraction process. Examples: "Extract only the financial data"',
+                                placeholder: 'Extract table data from images',
+                        },
+                        {
+                                displayName: 'Merge',
+                                name: 'merge',
+                                type: 'boolean',
+                                default: false,
+                                required: false,
+                                displayOptions: {
+                                        show: {
+                                                operation: ['importVisionAI'],
+                                        },
+                                },
+                                description: 'Whether to merge data from all files in a single table. If the table_id is provided, the data will be automatically merged into the specified table.',
                         },
                 ],
         };
@@ -254,6 +471,12 @@ export class Rows implements INodeType {
                                         });
                                 } else if (operation === 'overwrite') {
                                         const result = await overwriteDataInTable(this, i);
+                                        returnData.push({
+                                                json: result,
+                                                pairedItem: { item: i },
+                                        });
+                                } else if (operation === 'importVisionAI') {
+                                        const result = await importDataFromVisionAI(this, i);
                                         returnData.push({
                                                 json: result,
                                                 pairedItem: { item: i },
