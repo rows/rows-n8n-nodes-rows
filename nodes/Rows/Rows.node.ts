@@ -83,73 +83,68 @@ async function overwriteDataInTable(context: IExecuteFunctions, itemIndex: numbe
 
 async function importDataFromVisionAI(context: IExecuteFunctions, itemIndex: number) {
         const mode = context.getNodeParameter('visionMode', itemIndex) as string;
-        const binaryPropertyName = context.getNodeParameter('binaryPropertyName', itemIndex) as string;
+        const binaryPropertyNames = context.getNodeParameter('binaryPropertyNames', itemIndex) as string | string[];
         const folderId = context.getNodeParameter('folderId', itemIndex, '') as string;
         const appId = context.getNodeParameter('appId', itemIndex, '') as string;
         const tableId = context.getNodeParameter('tableId', itemIndex, '') as string;
         const instructions = context.getNodeParameter('instructions', itemIndex, '') as string;
         const merge = context.getNodeParameter('merge', itemIndex, false) as boolean;
-
-        const item = context.getInputData()[itemIndex];
-        const binaryData = item.binary?.[binaryPropertyName];
-
-        if (!binaryData) {
-                throw new NodeOperationError(
-                        context.getNode(),
-                        `No binary data found for property "${binaryPropertyName}". Make sure the previous node outputs binary data.`
-                );
+      
+        // normalize to array
+        const propertyNames = Array.isArray(binaryPropertyNames) ? binaryPropertyNames : [binaryPropertyNames];
+      
+        // Build the multipart form
+        const formData: any = { mode };
+        const files: any[] = [];
+      
+        for (const propertyName of propertyNames) {
+          // This is the robust way to access binary in custom nodes
+          const buffer = await context.helpers.getBinaryDataBuffer(itemIndex, propertyName);
+          const binMeta = context.getBinaryData(itemIndex, propertyName);
+      
+          if (!buffer) {
+            throw new NodeOperationError(
+              context.getNode(),
+              `No binary data found for property "${propertyName}". Make sure the previous node outputs binary data.`,
+            );
+          }
+      
+          files.push({
+            value: buffer,
+            options: {
+              filename: binMeta.fileName || 'file',
+              contentType: binMeta.mimeType || 'application/pdf',
+            },
+          });
         }
-
-        // n8n stores binary data as base64 strings
-        const dataBuffer = Buffer.from(binaryData.data, 'base64');
-        const fileName = binaryData.fileName || 'file';
-        const mimeType = binaryData.mimeType || 'application/pdf';
-
-        // Build form data with all required and optional parameters
-        const formData: any = {
-                files: {
-                        value: dataBuffer,
-                        options: {
-                                filename: fileName,
-                                contentType: mimeType,
-                        },
-                },
-                mode: mode,
-        };
-
-        // Add optional parameters if provided
-        if (folderId) {
-                formData.folder_id = folderId;
+      
+        if (files.length === 0) {
+          throw new NodeOperationError(context.getNode(), 'At least one file is required.');
         }
-
-        if (appId) {
-                formData.app_id = appId;
-        }
-
-        if (tableId) {
-                formData.table_id = tableId;
-        }
-
-        if (instructions) {
-                formData.instructions = instructions;
-        }
-
-        if (merge) {
-                formData.merge = merge.toString();
-        }
-
+      
+        // Multiple files under the same field name is fine
+        formData.files = files;
+      
+        // optional params
+        if (folderId) formData.folder_id = folderId;
+        if (appId) formData.app_id = appId;
+        if (tableId) formData.table_id = tableId;
+        if (instructions) formData.instructions = instructions;
+        if (merge) formData.merge = merge.toString();
+      
         const options: IHttpRequestOptions = {
-                method: 'POST',
-                url: 'https://api.rows.com/v1/vision/import',
-                headers: {
-                        'Accept': 'application/json',
-                },
-                formData,
+          method: 'POST',
+          url: 'https://api.rows.com/v1/vision/import',
+          // IMPORTANT: use formData + useFormData, *not* body
+          formData,
+          useFormData: true,
+          // Do NOT set Content-Type; the helper will add the proper boundary
+          headers: { Accept: 'application/json' },
         };
-
+      
         const response = await context.helpers.httpRequestWithAuthentication.call(context, 'rowsApi', options);
         return response;
-}
+      }
 
 export class Rows implements INodeType {
         description: INodeTypeDescription = {
@@ -294,8 +289,11 @@ export class Rows implements INodeType {
                         },
                         {
                                 displayName: 'Binary Property',
-                                name: 'binaryPropertyName',
+                                name: 'binaryPropertyNames',
                                 type: 'string',
+                                typeOptions: {
+                                        multipleValues: true,
+                                },
                                 default: 'data',
                                 required: true,
                                 displayOptions: {
@@ -303,7 +301,7 @@ export class Rows implements INodeType {
                                                 operation: ['importVisionAI'],
                                         },
                                 },
-                                description: 'The name of the binary property that contains the PDF or image file. Supported formats: PNG, JPG, JPEG, WEBP, PDF. The file should be provided by a previous node that outputs binary data.',
+                                description: 'One or more image files to process. Supported formats: PNG, JPG, JPEG, WEBP, PDF. The files should be provided by a previous node that outputs binary data.',
                                 placeholder: 'data',
                         },
                         {
@@ -318,7 +316,7 @@ export class Rows implements INodeType {
                                                 visionMode: ['create'],
                                         },
                                 },
-                                description: 'The folder unique identifier where the spreadsheet will be created. If not present, the system will use the first available folder.',
+                                description: 'The folder unique identifier where the spreadsheet will be created (for create mode). If not present, the system will use the first available folder.',
                         },
                         {
                                 displayName: 'Spreadsheet ID',
