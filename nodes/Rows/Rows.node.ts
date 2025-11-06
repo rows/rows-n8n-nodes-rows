@@ -83,49 +83,115 @@ async function overwriteDataInTable(context: IExecuteFunctions, itemIndex: numbe
 
 async function importDataFromVisionAI(context: IExecuteFunctions, itemIndex: number) {
         const mode = context.getNodeParameter('visionMode', itemIndex) as string;
-        const binaryPropertyNames = context.getNodeParameter('binaryPropertyNames', itemIndex) as string | string[];
+        const binaryPropertyNames = context.getNodeParameter('binaryPropertyNames', itemIndex) as string | string[] | Array<{ name?: string; value?: string }>;
         const folderId = context.getNodeParameter('folderId', itemIndex, '') as string;
         const appId = context.getNodeParameter('appId', itemIndex, '') as string;
         const tableId = context.getNodeParameter('tableId', itemIndex, '') as string;
         const instructions = context.getNodeParameter('instructions', itemIndex, '') as string;
         const merge = context.getNodeParameter('merge', itemIndex, false) as boolean;
       
-        // normalize to array
-        const propertyNames = Array.isArray(binaryPropertyNames) ? binaryPropertyNames : [binaryPropertyNames];
+        // Normalize to array and extract string values
+        let propertyNames: string[] = [];
+        if (Array.isArray(binaryPropertyNames)) {
+                // Handle array - could be strings or objects
+                propertyNames = binaryPropertyNames.map(item => {
+                        if (typeof item === 'string') {
+                                return item;
+                        } else if (item && typeof item === 'object') {
+                                // Handle various object structures that n8n might return
+                                // Try common property names that n8n uses
+                                const obj = item as any;
+                                return obj.name || obj.value || obj.propertyName || obj.key || 
+                                       (obj.fileName ? 'data' : undefined) || // fallback if it's binary data itself
+                                       JSON.stringify(item); // last resort
+                        }
+                        return String(item);
+                }).filter((name): name is string => {
+                        // Filter out any invalid values and ensure we have strings
+                        return typeof name === 'string' && name.length > 0 && name !== 'undefined';
+                });
+        } else if (binaryPropertyNames && typeof binaryPropertyNames === 'object') {
+                // Single object case
+                const obj = binaryPropertyNames as any;
+                const name = obj.name || obj.value || obj.propertyName || obj.key || 'data';
+                if (typeof name === 'string' && name.length > 0) {
+                        propertyNames = [name];
+                } else {
+                        propertyNames = ['data']; // default fallback
+                }
+        } else {
+                propertyNames = [String(binaryPropertyNames || 'data')];
+        }
       
         // Build the multipart form
         const formData: any = { mode };
         const files: any[] = [];
       
+        const item = context.getInputData()[itemIndex];
+        
+        if (propertyNames.length === 0) {
+                throw new NodeOperationError(
+                        context.getNode(),
+                        `No valid binary property names found. Received: ${JSON.stringify(binaryPropertyNames)}. Please specify binary property names (e.g., "data").`,
+                );
+        }
+        
         for (const propertyName of propertyNames) {
-          // This is the robust way to access binary in custom nodes
-          const buffer = await context.helpers.getBinaryDataBuffer(itemIndex, propertyName);
-          const binMeta = context.getBinaryData(itemIndex, propertyName);
-      
-          if (!buffer) {
-            throw new NodeOperationError(
-              context.getNode(),
-              `No binary data found for property "${propertyName}". Make sure the previous node outputs binary data.`,
-            );
-          }
-      
-          files.push({
-            value: buffer,
-            options: {
-              filename: binMeta.fileName || 'file',
-              contentType: binMeta.mimeType || 'application/pdf',
-            },
-          });
+                if (!propertyName || typeof propertyName !== 'string') {
+                        throw new NodeOperationError(
+                                context.getNode(),
+                                `Invalid binary property name: ${JSON.stringify(propertyName)}. Expected a string.`,
+                        );
+                }
+                
+                // Get binary data from the item
+                const binaryData = item.binary?.[propertyName];
+                if (!binaryData) {
+                        const availableProperties = item.binary ? Object.keys(item.binary).join(', ') : 'none';
+                        throw new NodeOperationError(
+                                context.getNode(),
+                                `No binary data found for property "${propertyName}". Available binary properties: ${availableProperties}. Make sure the previous node outputs binary data with the specified property name.`,
+                        );
+                }
+                
+                // Get buffer from binary data
+                const buffer = await context.helpers.getBinaryDataBuffer(itemIndex, propertyName);
+                if (!buffer) {
+                        throw new NodeOperationError(
+                                context.getNode(),
+                                `Failed to get binary buffer for property "${propertyName}".`,
+                        );
+                }
+        
+                files.push({
+                        value: buffer,
+                        options: {
+                                filename: binaryData.fileName || 'file',
+                                contentType: binaryData.mimeType || 'application/pdf',
+                        },
+                });
         }
       
         if (files.length === 0) {
-          throw new NodeOperationError(context.getNode(), 'At least one file is required.');
+                throw new NodeOperationError(context.getNode(), 'At least one file is required.');
         }
       
-        // Multiple files under the same field name is fine
+        // Validate that all files have buffers
+        for (let i = 0; i < files.length; i++) {
+                if (!files[i] || !files[i].value) {
+                        throw new NodeOperationError(
+                                context.getNode(),
+                                `File at index ${i} is missing a valid buffer.`,
+                        );
+                }
+        }
+      
+        // n8n's httpRequest automatically detects Buffers and sends as multipart/form-data
+        // The API expects 'files' to be an array, even for a single file
+        // Each file object should have: { value: Buffer, options: { filename, contentType } }
         formData.files = files;
       
-        // optional params
+        // Add optional params as strings
         if (folderId) formData.folder_id = folderId;
         if (appId) formData.app_id = appId;
         if (tableId) formData.table_id = tableId;
@@ -133,13 +199,12 @@ async function importDataFromVisionAI(context: IExecuteFunctions, itemIndex: num
         if (merge) formData.merge = merge.toString();
       
         const options: IHttpRequestOptions = {
-          method: 'POST',
-          url: 'https://api.rows.com/v1/vision/import',
-          // IMPORTANT: use formData + useFormData, *not* body
-          formData,
-          useFormData: true,
-          // Do NOT set Content-Type; the helper will add the proper boundary
-          headers: { Accept: 'application/json' },
+                method: 'POST',
+                url: 'https://api.rows.com/v1/vision/import',
+                headers: {
+                        'Accept': 'application/json',
+                },
+                body: formData as any,
         };
       
         const response = await context.helpers.httpRequestWithAuthentication.call(context, 'rowsApi', options);
