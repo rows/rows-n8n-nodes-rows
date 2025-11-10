@@ -1,5 +1,9 @@
-import { IBinaryData, IExecuteFunctions, IHttpRequestOptions, NodeOperationError, } from 'n8n-workflow';
-import FormData from 'form-data';
+import {
+    IBinaryData,
+    IExecuteFunctions,
+    IHttpRequestOptions,
+    NodeOperationError,
+} from 'n8n-workflow';
 import {
     getFileExtension,
     validateFileType,
@@ -8,6 +12,7 @@ import {
     VISION_MAX_NR_OF_FILES,
     VISION_MAX_TOTAL_SIZE,
 } from '../utils/validation';
+import { buildMultipartFormData } from '../utils/multipart';
 
 type BinaryFile = {
     data: Buffer;
@@ -40,41 +45,44 @@ async function sendVisionImportRequest(
     const merge = context.getNodeParameter('merge', itemIndex, false) as boolean;
     const instructions = context.getNodeParameter('instructions', itemIndex, '') as string;
 
-    // Build multipart form data
-    const formData = new FormData();
-
-    // Add all files
-    for (const file of allBinaryFiles) {
-        formData.append('files', file.data, {
-            filename: file.filename,
-            contentType: file.mimeType || 'application/octet-stream',
-        });
-    }
-
-    // Add optional parameters only if provided
+    // Build form fields
+    const fields: Array<{ name: string; value: string }> = [];
     if (folderId) {
-        formData.append('folder_id', folderId);
+        fields.push({ name: 'folder_id', value: folderId });
     }
     if (appId) {
-        formData.append('app_id', appId);
+        fields.push({ name: 'app_id', value: appId });
     }
     if (tableId) {
-        formData.append('table_id', tableId);
+        fields.push({ name: 'table_id', value: tableId });
     }
     if (mode) {
-        formData.append('mode', mode);
+        fields.push({ name: 'mode', value: mode });
     }
-    formData.append('merge', merge.toString());
+    fields.push({ name: 'merge', value: merge.toString() });
     if (instructions) {
-        formData.append('instructions', instructions);
+        fields.push({ name: 'instructions', value: instructions });
     }
+
+    // Build file entries
+    const files = allBinaryFiles.map((file) => ({
+        name: 'files',
+        data: file.data,
+        filename: file.filename,
+        contentType: file.mimeType || 'application/octet-stream',
+    }));
+
+    // Build multipart form data (using custom builder - no form-data dependency)
+    const { body, contentType } = buildMultipartFormData(fields, files);
 
     // Make authenticated request
     const options: IHttpRequestOptions = {
         method: 'POST',
         url: 'https://api.rows.com/v1/vision/import',
-        body: formData,
-        headers: formData.getHeaders(),
+        body: body,
+        headers: {
+            'Content-Type': contentType,
+        },
     };
 
     return await context.helpers.httpRequestWithAuthentication.call(context, 'rowsApi', options);

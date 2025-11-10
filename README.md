@@ -183,6 +183,7 @@ Check logs for API request/response details.
 * [n8n node development docs](https://docs.n8n.io/integrations/creating-nodes/)
 * [Rows API documentation](https://rows.com/docs/using-rows-api)
 * [n8n community nodes](https://docs.n8n.io/integrations/community-nodes/)
+* [npm package (this)](https://www.npmjs.com/package/@rowshq/n8n-nodes-rows)
 
 ## Example workflows
 
