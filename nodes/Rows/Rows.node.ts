@@ -150,11 +150,14 @@ export class Rows implements INodeType {
                     },
                 },
                 default: true,
+                // eslint-disable-next-line n8n-nodes-base/node-param-required-false
                 required: false,
+                // eslint-disable-next-line n8n-nodes-base/node-param-description-boolean-without-whether
                 description:
                     'When enabled, collects files from all input items and sends them in a single API request. When disabled, processes each item separately.',
             },
             {
+                // eslint-disable-next-line n8n-nodes-base/node-param-display-name-wrong-for-dynamic-options
                 displayName: 'Folder ID',
                 name: 'folderId',
                 type: 'options',
@@ -167,11 +170,13 @@ export class Rows implements INodeType {
                     },
                 },
                 default: '',
+                // eslint-disable-next-line n8n-nodes-base/node-param-required-false
                 required: false,
                 description:
                     'The folder to use. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
             },
             {
+                // eslint-disable-next-line n8n-nodes-base/node-param-display-name-wrong-for-dynamic-options
                 displayName: 'Spreadsheet ID',
                 name: 'appId',
                 type: 'options',
@@ -185,11 +190,14 @@ export class Rows implements INodeType {
                     },
                 },
                 default: '',
+                // eslint-disable-next-line n8n-nodes-base/node-param-required-false
                 required: false,
+                // eslint-disable-next-line n8n-nodes-base/node-param-description-wrong-for-dynamic-options
                 description:
                     'The spreadsheet to use. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>. Sent to API as "app_id" parameter. Filtered by Folder ID if provided.',
             },
             {
+                // eslint-disable-next-line n8n-nodes-base/node-param-display-name-wrong-for-dynamic-options
                 displayName: 'Table ID',
                 name: 'tableId',
                 type: 'options',
@@ -203,7 +211,9 @@ export class Rows implements INodeType {
                     },
                 },
                 default: '',
+                // eslint-disable-next-line n8n-nodes-base/node-param-required-false
                 required: false,
+                // eslint-disable-next-line n8n-nodes-base/node-param-description-wrong-for-dynamic-options
                 description:
                     'The table to use. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>. Required when Spreadsheet ID is provided.',
             },
@@ -234,6 +244,7 @@ export class Rows implements INodeType {
                     },
                 ],
                 default: 'create',
+                // eslint-disable-next-line n8n-nodes-base/node-param-required-false
                 required: false,
                 description: 'Processing mode that affects the response format',
             },
@@ -247,6 +258,7 @@ export class Rows implements INodeType {
                     },
                 },
                 default: false,
+                // eslint-disable-next-line n8n-nodes-base/node-param-required-false
                 required: false,
                 description: 'Whether to merge with existing data',
             },
@@ -263,6 +275,7 @@ export class Rows implements INodeType {
                     },
                 },
                 default: '',
+                // eslint-disable-next-line n8n-nodes-base/node-param-required-false
                 required: false,
                 description:
                     'Custom instructions for data extraction (e.g., "Extract all data from this image")',
