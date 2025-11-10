@@ -181,7 +181,7 @@ Check logs for API request/response details.
 ## Resources
 
 * [n8n node development docs](https://docs.n8n.io/integrations/creating-nodes/)
-* [Rows API documentation](https://rows.com/docs/api)
+* [Rows API documentation](https://rows.com/docs/using-rows-api)
 * [n8n community nodes](https://docs.n8n.io/integrations/community-nodes/)
 
 ## Example workflows
