@@ -2,6 +2,27 @@
 
 An n8n community node for integrating with the [Rows API](https://rows.com/docs/api).
 
+- [Development Setup](#development-setup)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Project Structure](#project-structure)
+- [Implementation Details](#implementation-details)
+  - [Node Architecture](#node-architecture)
+  - [API Integration](#api-integration)
+  - [Key Files](#key-files)
+    - [`Rows.node.ts`](#rowsnodets)
+    - [`operations/`](#operations)
+    - [`utils/validation.ts`](#utilsvalidationts)
+    - [`RowsApi.credentials.ts`](#rowsapicredentialsts)
+- [Development Workflow](#development-workflow)
+  - [Making Changes](#making-changes)
+  - [Testing Locally](#testing-locally)
+  - [Debugging](#debugging)
+- [Publishing](#publishing)
+- [Resources](#resources)
+- [Example workflows](#example-workflows)
+  - [Vision](#vision)
+
 ## Development Setup
 
 ### Prerequisites
@@ -51,9 +72,15 @@ n8n-nodes-rows/
 │   └── RowsApi.credentials.ts    # API credential configuration
 ├── nodes/
 │   └── Rows/
-│       ├── Rows.node.ts           # Main node implementation
-│       ├── Rows.node.json         # Node codex metadata
-│       └── rows.svg               # Node icon
+│       ├── operations/          # Operation-specific implementations
+│       │   ├── appendData.ts    # Append Data operation
+│       │   ├── overwriteData.ts # Overwrite Data operation
+│       │   └── importVisionData.ts # Vision Import operation
+│       ├── utils/                # Shared utilities
+│       │   └── validation.ts    # File validation functions
+│       ├── Rows.node.ts         # Main node implementation
+│       ├── Rows.node.json       # Node codex metadata
+│       └── rows.svg             # Node icon
 ├── package.json
 └── tsconfig.json
 ```
@@ -62,27 +89,47 @@ n8n-nodes-rows/
 
 ### Node Architecture
 
-The node implements two operations:
+The node implements three operations:
 - **Append Data**: Uses the `/values/{range}:append` endpoint
 - **Overwrite Data**: Uses the `/cells/{range}` endpoint
+- **Import Vision Data**: Uses the `/vision/import` endpoint for extracting data from image files
 
-Both operations are extracted into standalone async functions (`appendDataToTable`, `overwriteDataInTable`) that receive the execution context and item index as parameters.
+All operations are extracted into standalone async functions in the `operations/` directory:
+- `appendDataToTable`: Appends data to a table
+- `overwriteDataInTable`: Overwrites data in a table
+- `importVisionData`: Processes a single item (one file per request)
+- `importVisionDataFromAllItems`: Processes all items (multiple files in one request)
+
+Shared utilities (file validation, constants) are in the `utils/` directory.
 
 ### API Integration
 
 The node uses:
 - `httpRequestWithAuthentication` for authenticated API calls
-- Dynamic option loading for spreadsheets and tables
+- Dynamic option loading for spreadsheets, tables, and folders
 - Bearer token authentication via credentials
+- Multipart form data for file uploads (vision import)
 
 ### Key Files
 
 #### `Rows.node.ts`
 Main node implementation with:
 - Node description and properties
-- `loadOptions` methods for dynamic dropdowns
+- `loadOptions` methods for dynamic dropdowns (spreadsheets, tables, folders)
 - `execute` method for processing workflow items
-- Helper functions for API operations
+- Orchestrates calls to operation functions
+
+#### `operations/`
+Operation-specific implementations:
+- `appendData.ts`: Append data to spreadsheet tables
+- `overwriteData.ts`: Overwrite data in spreadsheet tables
+- `importVisionData.ts`: Vision import with file handling and multipart form data
+
+#### `utils/validation.ts`
+Shared validation utilities:
+- File type validation (png, jpg, jpeg, webp, pdf)
+- File size validation (per file and total limits)
+- Maximum number of files validation
 
 #### `RowsApi.credentials.ts`
 Defines the credential schema for Rows API key authentication.
@@ -136,3 +183,13 @@ Check logs for API request/response details.
 * [n8n node development docs](https://docs.n8n.io/integrations/creating-nodes/)
 * [Rows API documentation](https://rows.com/docs/api)
 * [n8n community nodes](https://docs.n8n.io/integrations/community-nodes/)
+
+## Example workflows
+
+### Vision
+
+```
+Read/Write files (file1) ──┐
+                           ├──> Merge ──> Rows (Import Vision Data)
+Read/Write files (file2) ──┘
+```
