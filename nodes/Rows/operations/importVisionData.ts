@@ -6,6 +6,7 @@ import {
 } from 'n8n-workflow';
 import {
     getFileExtension,
+    requiresCreateMode,
     validateFileType,
     VISION_ALLOWED_FILE_TYPES,
     VISION_MAX_FILE_SIZE,
@@ -194,6 +195,21 @@ export async function importVisionData(context: IExecuteFunctions, itemIndex: nu
         );
     }
 
+    // Validate mode for file types that require 'create' mode
+    const mode = context.getNodeParameter('mode', itemIndex, 'create') as string;
+    const filesRequiringCreateMode = allBinaryFiles.filter((file) =>
+        requiresCreateMode(file.filename),
+    );
+    if (filesRequiringCreateMode.length > 0 && mode !== 'create') {
+        const fileTypes = filesRequiringCreateMode
+            .map((file) => getFileExtension(file.filename))
+            .join(', ');
+        throw new NodeOperationError(
+            context.getNode(),
+            `File types (${fileTypes}) are only allowed when Mode is set to "Create". Please change the Mode parameter to "Create" or use different file types.`,
+        );
+    }
+
     // Send API request with collected files and parameters
     return await sendVisionImportRequest(context, itemIndex, allBinaryFiles);
 }
@@ -318,6 +334,21 @@ export async function importVisionDataFromAllItems(context: IExecuteFunctions): 
         throw new NodeOperationError(
             context.getNode(),
             `Total size of all files (${(totalSize / 1024 / 1024).toFixed(2)}MB) exceeds maximum allowed size of ${VISION_MAX_TOTAL_SIZE}MB`,
+        );
+    }
+
+    // Validate mode for file types that require 'create' mode
+    const mode = context.getNodeParameter('mode', 0, 'create') as string;
+    const filesRequiringCreateMode = allBinaryFiles.filter((file) =>
+        requiresCreateMode(file.filename),
+    );
+    if (filesRequiringCreateMode.length > 0 && mode !== 'create') {
+        const fileTypes = filesRequiringCreateMode
+            .map((file) => getFileExtension(file.filename))
+            .join(', ');
+        throw new NodeOperationError(
+            context.getNode(),
+            `File types (${fileTypes}) are only allowed when Mode is set to "Create". Please change the Mode parameter to "Create" or use different file types.`,
         );
     }
 
