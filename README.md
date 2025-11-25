@@ -57,7 +57,7 @@ An n8n community node for integrating with the [Rows API](https://rows.com/docs/
 5. Link in your n8n installation:
    ```bash
    cd ~/.n8n/custom
-   npm link n8n-nodes-rows
+   npm link @rowshq/n8n-nodes-rows
    ```
 
 In case you don't have the folder `custom` locally, you can create it with `mkdir custom`
