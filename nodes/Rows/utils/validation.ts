@@ -1,4 +1,4 @@
-export const VISION_ALLOWED_FILE_TYPES = ['png', 'jpg', 'jpeg', 'webp', 'pdf', 'csv', 'tsv', 'xls', 'xlsx'];
+export const VISION_ALLOWED_FILE_TYPES = ['png', 'jpg', 'jpeg', 'webp', 'pdf', 'heic', 'csv', 'tsv', 'xls', 'xlsx'];
 export const VISION_MAX_FILE_SIZE = 80 * 1024 * 1024; // 80MB in bytes
 export const VISION_MAX_TOTAL_SIZE = 80 * 1024 * 1024; // 80MB in bytes
 export const VISION_MAX_NR_OF_FILES = 50;

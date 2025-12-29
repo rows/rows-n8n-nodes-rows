@@ -138,7 +138,7 @@ export class Rows implements INodeType {
                 default: 'data',
                 required: true,
                 description:
-                    'Name of the binary property that contains the file(s) to upload. Default is "data" (used by "Read/Write files from disc" node). The files will be sent to the API as "files" parameter. Supported formats: png, jpg, jpeg, webp, pdf, csv, tsv, xls, xlsx. Note: CSV, TSV, XLS, and XLSX files require Mode to be set to "Create". Max size: 100MB per file, 100MB total.',
+                    'Name of the binary property that contains the file(s) to upload. Default is "data" (used by "Read/Write files from disc" node). The files will be sent to the API as "files" parameter. Supported formats: png, jpg, jpeg, webp, pdf, heic, csv, tsv, xls, xlsx. Note: CSV, TSV, XLS, and XLSX files require Mode to be set to "Create". Max size: 100MB per file, 100MB total.',
             },
             {
                 displayName: 'Collect All Files From All Items',
